@@ -80,13 +80,13 @@ work; an unchecked item is a planned exercise, not a completed capability.
 |---|---|---|
 | 1. Application | Go CRUD API, SQL migration, local PostgreSQL | ✅ CRUD, persistence, and database outage behaviour verified locally |
 | 2. Quality | Integration tests, formatting, linting, pre-commit | 🟡 CI workflow configured; first GitHub run and Codecov upload pending |
-| 3. Container | Multi-stage Dockerfile, non-root image, Trivy scan | ⬜ Planned |
-| 4. AWS foundation | IAM, VPC, EC2, S3, ECR, CloudWatch; Terraform and Ansible | ⬜ Planned |
+| 3. Container | Multi-stage Dockerfile, non-root image, Trivy scan | 🟡 Both images pass local HIGH/CRITICAL Trivy gate; GitHub CI run pending |
+| 4. AWS foundation | IAM, VPC, EC2, S3, ECR, CloudWatch; Terraform and Ansible | 🟡 ECR publish workflow prepared but disabled; AWS setup pending |
 | 5. Kubernetes | K3s first; Services, probes, Secrets, storage, RBAC | ⬜ Planned |
 | 6. Delivery | GitHub Actions, Helm, Argo CD and immutable image promotion | ⬜ Planned |
 | 7. Operations | Prometheus, Grafana, Alertmanager, SLI/SLO and PagerDuty | ⬜ Planned |
 | 8. Resilience | k6, smoke tests, chaos exercise, backup/restore and runbooks | ⬜ Planned |
-| 9. Extensions | SonarQube, Jenkins comparison, small Go operator, temporary EKS exercise | ⬜ Planned |
+| 9. Extensions | SonarQube, Jenkins comparison, small Go operator, temporary EKS exercise | 🟡 SonarQube Cloud project imported; token and first CI analysis pending |
 
 The older [project specification](01-project-specification.md) and
 [ten-day plan](02-ten-day-implementation-plan.md) were drafted for a VPS and
@@ -131,6 +131,25 @@ python3 scripts/smoke_test.py
 Stop the database with `docker compose down`. Its named volume keeps data.
 `docker compose down -v` removes that volume and its data.
 
+### 🐳 Run the full stack in containers
+
+The local Compose stack starts PostgreSQL, runs the migration once, and then
+starts the API. Use the same local-only example password as above:
+
+```bash
+export POSTGRES_PASSWORD=localdev
+docker compose up -d --build --wait api
+python3 scripts/smoke_test.py
+docker compose ps -a
+docker compose down
+```
+
+`docker compose down` keeps PostgreSQL data in its named volume. See the
+[container walkthrough](docs/containers.md) to learn what the Dockerfile
+stages do and how to inspect failures. If you set a different password, URL
+encode any reserved URL characters because Compose inserts it into a database
+connection URL.
+
 ### 🔌 API contract
 
 | Endpoint | Behaviour |
@@ -160,9 +179,9 @@ only from a trusted network or Prometheus; it has no authentication.
 
 ```mermaid
 flowchart LR
-    Client["curl / HTTP client"] --> API["Go Task API<br/>localhost:8080"]
-    API --> DB[("PostgreSQL<br/>Docker Compose")]
-    Migration["001_create_tasks.sql"] --> DB
+    Client["curl / HTTP client"] --> API["Go Task API container<br/>localhost:8080"]
+    API --> DB[("PostgreSQL container")]
+    Migration["Migration container<br/>runs before API"] --> DB
 ```
 
 ### Target AWS lab — planned
@@ -234,8 +253,12 @@ run. No latency, availability, or recovery result is claimed yet.
 | 🗃️ | [Initial migration](migrations/001_create_tasks.sql) | PostgreSQL schema |
 | 🔄 | [Migration procedure](docs/migrations.md) | Local and planned Kubernetes release sequence |
 | 🧾 | [Backend local evidence](docs/evidence/backend-local.md) | Tests, persistence, outage and smoke-test results |
-| 🐳 | [Compose file](compose.yaml) | Local PostgreSQL service |
+| 🐳 | [Container walkthrough](docs/containers.md) | Dockerfile stages, Compose startup, smoke test and cleanup |
+| 🔐 | [Security and publishing](docs/security-and-publishing.md) | Trivy, SonarQube Cloud and ECR setup |
+| 🧾 | [Image scan evidence](docs/evidence/container-security.md) | Initial pgx findings and clean rescans |
+| 🐳 | [Compose file](compose.yaml) | Local PostgreSQL, migration and API services |
 | ✅ | [CI workflow](.github/workflows/ci.yml) | Push checks, PostgreSQL tests, and Codecov upload |
+| 📦 | [ECR workflow](.github/workflows/publish-ecr.yml) | SHA-tagged image publishing after a passing CI run; disabled by default |
 | 🤝 | [Contributing](CONTRIBUTING.md) | Development and pull request workflow |
 | 🔐 | [Security policy](SECURITY.md) | Private vulnerability reporting |
 | 📜 | [Code of conduct](CODE_OF_CONDUCT.md) | Community expectations |
@@ -254,7 +277,11 @@ cmd/migrate/                     Migration command
 migrations/                      Versioned SQL migration
 scripts/smoke_test.py            Post-deployment API smoke test
 docs/migrations.md               Migration release procedure
-compose.yaml                     Local PostgreSQL
+Dockerfile                       API and migration images
+compose.yaml                     Local PostgreSQL, migration and API
+docs/containers.md              Container walkthrough
+docs/security-and-publishing.md Trivy, SonarQube Cloud and ECR setup
+sonar-project.properties        Go analysis and coverage configuration
 01-project-specification.md      Earlier project draft
 02-ten-day-implementation-plan.md Earlier implementation draft
 .github/ISSUE_TEMPLATE/          Bug and feature request forms
@@ -284,7 +311,8 @@ use the local Go toolchain and require no downloaded hook repositories.
 
 Every push runs the same hooks in
 [GitHub Actions](.github/workflows/ci.yml), followed by race-enabled tests
-against a dedicated PostgreSQL service and a Codecov coverage upload. To
+against a dedicated PostgreSQL service, two Trivy image scans, an optional
+SonarQube Cloud analysis, and a Codecov coverage upload. To
 enable the upload, add the repository secret `CODECOV_TOKEN` from your Codecov
 repository settings under **GitHub → Settings → Secrets and variables →
 Actions**. The upload step fails if Codecov rejects the report; a passing

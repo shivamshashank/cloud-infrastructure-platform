@@ -3,6 +3,9 @@
 /api
 /migrate
 coverage.out
+api-image.tar
+migrate-image.tar
+.scannerwork/
 terraform.tfstate
 terraform.tfstate.*
 .terraform/

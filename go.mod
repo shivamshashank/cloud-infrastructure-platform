@@ -3,7 +3,7 @@ module github.com/shivamshashank/cloud-infrastructure-platform
 go 1.27.1
 
 require (
-	github.com/jackc/pgx/v5 v5.8.0
+	github.com/jackc/pgx/v5 v5.11.0
 	github.com/prometheus/client_golang v1.24.1
 )
 

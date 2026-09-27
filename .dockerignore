@@ -1,0 +1,14 @@
+.git
+.github
+.env
+*.test
+coverage.out
+docs
+scripts
+01-project-specification.md
+02-ten-day-implementation-plan.md
+README.md
+LICENSE
+CONTRIBUTING.md
+CODE_OF_CONDUCT.md
+SECURITY.md

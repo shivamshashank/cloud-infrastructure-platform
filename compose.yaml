@@ -15,5 +15,29 @@ services:
       timeout: 2s
       retries: 15
 
+  migrate:
+    build:
+      context: .
+      target: migrate
+    environment:
+      DATABASE_URL: postgres://tasks:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@db:5432/tasks?sslmode=disable
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    build:
+      context: .
+      target: api
+    environment:
+      DATABASE_URL: postgres://tasks:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@db:5432/tasks?sslmode=disable
+    ports:
+      - "127.0.0.1:8080:8080"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
 volumes:
   postgres_data:
