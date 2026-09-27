@@ -86,7 +86,7 @@ work; an unchecked item is a planned exercise, not a completed capability.
 | 6. Delivery | GitHub Actions, Helm, Argo CD and immutable image promotion | ⬜ Planned |
 | 7. Operations | Prometheus, Grafana, Alertmanager, SLI/SLO and PagerDuty | ⬜ Planned |
 | 8. Resilience | k6, smoke tests, chaos exercise, backup/restore and runbooks | ⬜ Planned |
-| 9. Extensions | SonarQube, Jenkins comparison, small Go operator, temporary EKS exercise | 🟡 SonarQube Cloud project imported; token and first CI analysis pending |
+| 9. Extensions | SonarQube, Jenkins comparison, small Go operator, temporary EKS exercise | 🟡 First CI analysis imported Go coverage; new-code security gate needs a passing rerun |
 
 The older [project specification](01-project-specification.md) and
 [ten-day plan](02-ten-day-implementation-plan.md) were drafted for a VPS and
@@ -258,7 +258,7 @@ run. No latency, availability, or recovery result is claimed yet.
 | 🧾 | [Image scan evidence](docs/evidence/container-security.md) | Initial pgx findings and clean rescans |
 | 🐳 | [Compose file](compose.yaml) | Local PostgreSQL, migration and API services |
 | ✅ | [CI workflow](.github/workflows/ci.yml) | Push checks, PostgreSQL tests, and Codecov upload |
-| 📦 | [ECR workflow](.github/workflows/publish-ecr.yml) | SHA-tagged image publishing after a passing CI run; disabled by default |
+| 📦 | [ECR workflow](.github/workflows/publish-ecr.yml) | SHA-tagged image publishing after a merged PR and passing CI; disabled by default |
 | 🤝 | [Contributing](CONTRIBUTING.md) | Development and pull request workflow |
 | 🔐 | [Security policy](SECURITY.md) | Private vulnerability reporting |
 | 📜 | [Code of conduct](CODE_OF_CONDUCT.md) | Community expectations |

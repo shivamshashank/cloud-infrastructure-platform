@@ -1,20 +1,62 @@
 name: Publish to ECR
 
 on:
-  workflow_run:
-    workflows: [CI]
-    types: [completed]
+  push:
     branches: [main]
 
-permissions:
-  contents: read
-  id-token: write
-
 jobs:
-  publish:
-    if: ${{ github.event.workflow_run.conclusion == 'success' && vars.ENABLE_ECR_PUBLISH == 'true' }}
+  verify:
+    if: ${{ vars.ENABLE_ECR_PUBLISH == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
+    outputs:
+      source_sha: ${{ steps.gate.outputs.source_sha }}
+    steps:
+      - name: Require a merged pull request and successful CI
+        id: gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          pulls="$(gh api "repos/$GITHUB_REPOSITORY/commits/$SOURCE_SHA/pulls")"
+          if ! jq -e --arg sha "$SOURCE_SHA" \
+            'any(.[]; .merged_at != null and .base.ref == "main" and .merge_commit_sha == $sha)' \
+            <<< "$pulls" > /dev/null; then
+            echo 'No merged pull request introduced this main commit; skipping ECR publishing.'
+            exit 0
+          fi
+
+          for attempt in {1..40}; do
+            runs="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$SOURCE_SHA&event=push&branch=main&per_page=20")"
+            conclusion="$(jq -r --arg sha "$SOURCE_SHA" \
+              '[.workflow_runs[] | select(.head_sha == $sha)] | sort_by(.run_number) | last | .conclusion // empty' \
+              <<< "$runs")"
+            if [ "$conclusion" = success ]; then
+              echo "source_sha=$SOURCE_SHA" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            if [ -n "$conclusion" ]; then
+              echo "::error::CI concluded $conclusion for $SOURCE_SHA; refusing to publish."
+              exit 1
+            fi
+            sleep 20
+          done
+          echo "::error::CI did not finish for $SOURCE_SHA within the wait period."
+          exit 1
+
+  publish:
+    needs: verify
+    if: ${{ needs.verify.outputs.source_sha != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - name: Check ECR role configuration
         env:
@@ -25,10 +67,10 @@ jobs:
             exit 1
           fi
 
-      - name: Check out the commit that passed CI
+      - name: Check out the merge commit that passed CI
         uses: actions/checkout@v7
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ needs.verify.outputs.source_sha }}
           persist-credentials: false
 
       - name: Configure short-lived AWS credentials
@@ -47,7 +89,7 @@ jobs:
       - name: Build and publish API and migration images
         env:
           REGISTRY: ${{ steps.ecr.outputs.registry }}
-          SOURCE_SHA: ${{ github.event.workflow_run.head_sha }}
+          SOURCE_SHA: ${{ needs.verify.outputs.source_sha }}
         run: |
           set -euo pipefail
           repo="$REGISTRY/cloud-infrastructure-platform"

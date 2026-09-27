@@ -55,9 +55,9 @@ jobs:
         run: go test -race -coverpkg=./... -covermode=atomic -coverprofile=coverage.out ./...
 
       - name: Build container images
-        env:
-          POSTGRES_PASSWORD: localdev
-        run: docker compose build api migrate
+        run: |
+          docker build --target api -t cloud-infrastructure-platform-api:latest .
+          docker build --target migrate -t cloud-infrastructure-platform-migrate:latest .
 
       - name: Export images for scanning
         run: |
@@ -85,6 +85,7 @@ jobs:
           format: table
 
       - name: Check SonarQube Cloud token
+        if: ${{ github.ref == 'refs/heads/main' }}
         id: sonar_token
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
@@ -102,7 +103,7 @@ jobs:
           fi
 
       - name: Analyze code with SonarQube Cloud
-        if: ${{ steps.sonar_token.outputs.configured == 'true' }}
+        if: ${{ github.ref == 'refs/heads/main' && steps.sonar_token.outputs.configured == 'true' }}
         uses: SonarSource/sonarqube-scan-action@22918119ff8e1ca75a623e15c8296b6ea4fbe28f # v8.2.1
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}

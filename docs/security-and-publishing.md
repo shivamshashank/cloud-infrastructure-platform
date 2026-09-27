@@ -1,8 +1,12 @@
 # Security checks and image publishing
 
-The order is: test the Go code, build both runtime images, scan them, analyze
-source quality, then publish images from a commit whose CI passed. The ECR
-workflow is disabled until the AWS prerequisites are in place.
+CI runs on every push: test the Go code, build both runtime images, and scan
+them. SonarQube analysis runs on `main` pushes so the workflow also works on
+the SonarQube Cloud Free plan, which does not support ordinary feature-branch
+analysis. After a pull request merges into
+`main`, the separate CD workflow verifies that the resulting commit passed CI
+before publishing images. The ECR workflow is disabled until the AWS
+prerequisites are in place.
 
 ## 1. Repeat the local Trivy scan
 
@@ -49,9 +53,15 @@ In GitHub repository **Settings → Secrets and variables → Actions**, create:
 The CI action reads `sonar-project.properties`, including
 `sonar.go.coverage.reportPaths=coverage.out`. The test step generates that Go
 coverage file before the analysis. Once `SONAR_TOKEN` is set, the workflow
-waits for the SonarQube quality gate. Until then, CI prints a configuration
-warning and skips the analysis; if ECR publishing is enabled, a missing token
-fails CI.
+waits for the SonarQube quality gate. The first CI-based analysis uploaded
+coverage successfully (SonarQube displayed 50.4%) but failed the new-code
+security rating. The scan identified two new workflow findings: an unnecessary
+`POSTGRES_PASSWORD` variable in the CI image-build step and privileged
+`workflow_run` code checkout in the ECR workflow. The current changes remove
+that build variable and switch CD to a merge-only main push with an explicit
+CI-success check. These changes need a new scan before the gate can be
+considered passing. If `SONAR_TOKEN` is missing, CI prints a warning and
+skips analysis; when ECR publishing is enabled, a missing token fails CI.
 
 SonarSource currently documents full Go support through 1.25, while this
 project uses Go 1.27.1. Check the first analysis for parser warnings or
@@ -95,11 +105,14 @@ Then add repository Actions variables:
 | `AWS_ECR_PUBLISH_ROLE_ARN` | ARN of the narrow OIDC role |
 | `ENABLE_ECR_PUBLISH` | `true` when ready; leave unset to keep publishing off |
 
-The [publish workflow](../.github/workflows/publish-ecr.yml) runs only after a
-successful CI run on `main` and only while that switch is `true`. It checks
-out the exact commit that passed, builds the API and migration images, and
-pushes immutable `api-<commit SHA>` and `migrate-<commit SHA>` tags. It writes
-their image digests to the workflow summary. This is image publishing, not an
-application deployment; Kubernetes and GitOps come later. ECR storage can
-incur charges, so keep the repository small and remove unused images after
-the exercise.
+The [publish workflow](../.github/workflows/publish-ecr.yml) is triggered by
+pushes to `main`, which includes pull request merges. It starts only while
+`ENABLE_ECR_PUBLISH` is `true`. Its unprivileged `verify` job checks that the
+commit was introduced by a merged pull request into `main`, then waits for
+the CI push run for that exact SHA to succeed. Direct pushes do not publish.
+If CI fails, publishing fails closed. The `publish` job then checks out that
+verified merge commit, assumes the narrow AWS OIDC role, and pushes immutable
+`api-<commit SHA>` and `migrate-<commit SHA>` image tags. It writes their
+digests to the workflow summary. This is image publishing, not an application
+deployment; Kubernetes and GitOps come later. ECR storage can incur charges,
+so keep the repository small and remove unused images after the exercise.
