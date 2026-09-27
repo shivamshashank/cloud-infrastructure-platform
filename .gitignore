@@ -1,0 +1,8 @@
+.env
+*.test
+/api
+/migrate
+coverage.out
+terraform.tfstate
+terraform.tfstate.*
+.terraform/

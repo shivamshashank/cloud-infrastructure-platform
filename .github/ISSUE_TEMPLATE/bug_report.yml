@@ -1,0 +1,43 @@
+name: "🐛 Bug report"
+description: Report a reproducible problem in implemented behaviour
+title: "bug: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Check the README's current-status table first. Do not post secrets or
+        vulnerabilities here; follow SECURITY.md for private reporting.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What happened?
+      description: Describe the observed behaviour.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Include commands, request bodies, and sanitized output.
+      placeholder: |
+        1. Start the API...
+        2. Run curl...
+        3. Observe...
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Commit or version
+      description: A commit SHA is best while the project has no releases.
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, Go version, Docker/Kubernetes version, and local or AWS.

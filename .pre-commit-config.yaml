@@ -1,0 +1,28 @@
+repos:
+  - repo: local
+    hooks:
+      - id: gofmt
+        name: Format Go files with gofmt
+        entry: gofmt -w
+        language: system
+        types: [go]
+
+      - id: go-vet
+        name: Check Go code with go vet
+        entry: go vet ./...
+        language: system
+        files: '(^|/).*\.go$|^go\.(mod|sum)$'
+        pass_filenames: false
+
+      - id: go-test
+        name: Run Go tests
+        entry: go test ./...
+        language: system
+        files: '(^|/).*\.go$|^go\.(mod|sum)$'
+        pass_filenames: false
+
+      - id: trailing-whitespace
+        name: Check trailing whitespace
+        entry: python3 scripts/check_whitespace.py
+        language: system
+        types: [text]

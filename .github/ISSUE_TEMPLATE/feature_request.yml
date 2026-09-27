@@ -1,0 +1,28 @@
+name: "💡 Feature request"
+description: Propose a focused application or infrastructure improvement
+title: "feature: "
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to solve
+      description: What task or failure is difficult today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed change
+      description: Explain the smallest useful implementation.
+    validations:
+      required: true
+  - type: textarea
+    id: verification
+    attributes:
+      label: How would we verify it?
+      description: Include a test or hands-on acceptance check.
+  - type: textarea
+    id: cost
+    attributes:
+      label: AWS cost or operational impact
+      description: Complete this if the change creates resources or adds a service.
