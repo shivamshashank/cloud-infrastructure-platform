@@ -22,10 +22,12 @@ file produces an error. Add a new numbered file for a new schema change.
 ## Kubernetes release sequence
 
 1. Back up the database before a schema change and record the backup location.
-2. Build one image containing both `api` and `migrate` executables plus the
-   embedded migration files. Pin the image by digest.
-3. Run `migrate` as a Kubernetes Job with `DATABASE_URL` from a Secret. In
-   Argo CD, use a **PreSync** hook Job for this step. Set a bounded active
+2. Build the API and migration images from the same commit. The migration
+   image contains its embedded SQL files. Pin both images by digest.
+3. Run `migrate` as a Kubernetes Job with `DATABASE_URL` from a Secret. When
+   the planned Vault Secrets Operator exercise is enabled, wait for it to sync
+   that Secret before starting the Job; a missing Secret must stop the release.
+   In Argo CD, use a **PreSync** hook Job for this step. Set a bounded active
    deadline and a small retry limit; require the Job to finish successfully.
 4. Only after the Job succeeds, sync the API Deployment and run the smoke test.
 5. If migration fails, stop the rollout, inspect the Job log, fix the cause,

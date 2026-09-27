@@ -1,5 +1,10 @@
 # Cloud Infrastructure Platform: Ten-Day Implementation Plan
 
+> Historical schedule: use the [current README](README.md) for the active AWS
+> roadmap and the [Consul/Vault learning flow](docs/service-discovery-and-secrets.md)
+> for the added discovery and secrets exercises. VPS/GHCR steps below are
+> retained as planning history.
+
 ## Target
 
 Complete a small Go application platform on one remote 16 GB server. Learn by implementing, breaking, diagnosing and documenting each component. Follow [the project specification](01-project-specification.md) for architecture and boundaries.

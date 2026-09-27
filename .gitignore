@@ -9,3 +9,6 @@ migrate-image.tar
 terraform.tfstate
 terraform.tfstate.*
 .terraform/
+*.tfvars
+*.tfvars.json
+*.tfplan

@@ -1,5 +1,10 @@
 # Cloud Infrastructure Platform
 
+> Historical project draft: the current [README](README.md) and
+> [Consul/Vault learning flow](docs/service-discovery-and-secrets.md) govern
+> the AWS, ECR, service discovery, and secrets direction. VPS/GHCR assumptions
+> and the original tool scope below are retained as planning history.
+
 ## Purpose
 
 Build and operate a Go Task Management API on a single cloud server running Kubernetes. Automate infrastructure provisioning, application delivery, code quality checks, monitoring and recovery. Add a small Go Kubernetes operator to learn reconciliation through a narrowly defined workload.
