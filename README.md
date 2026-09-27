@@ -30,6 +30,8 @@ Task API. Each stage adds an operational capability and a way to prove it works.
 ![Kubernetes](https://img.shields.io/badge/Kubernetes-326CE5?style=for-the-badge&logo=kubernetes&logoColor=white)
 ![Helm](https://img.shields.io/badge/Helm-0F1689?style=for-the-badge&logo=helm&logoColor=white)
 ![Argo CD](https://img.shields.io/badge/Argo%20CD-EF7B4D?style=for-the-badge&logo=argo&logoColor=white)
+![Consul](https://img.shields.io/badge/Consul-F24C53?style=for-the-badge&logo=consul&logoColor=white)
+![Vault](https://img.shields.io/badge/Vault-FFEC6E?style=for-the-badge&logo=vault&logoColor=black)
 ![GitHub Actions](https://img.shields.io/badge/GitHub%20Actions-2088FF?style=for-the-badge&logo=githubactions&logoColor=white)
 ![Amazon ECR](https://img.shields.io/badge/Amazon%20ECR-FF9900?style=for-the-badge&logo=amazonaws&logoColor=white)
 ![Trivy](https://img.shields.io/badge/Trivy-1904DA?style=for-the-badge&logo=trivy&logoColor=white)
@@ -55,7 +57,8 @@ process to a repeatable cloud deployment:
 3. Provision a temporary AWS lab with Terraform and configure its host with
    Ansible.
 4. Deploy through Helm and Argo CD.
-5. Measure service behaviour, alert on failure, and practice recovery.
+5. Add a Vault secrets exercise and a Consul service discovery exercise.
+6. Measure service behaviour, alert on failure, and practice recovery.
 
 This is a **learning lab**, not a claim of production availability. The AWS
 environment will be created only for exercises and destroyed afterward to
@@ -66,7 +69,7 @@ preserve the available credits.
 | **Application** | Go HTTP Task API with PostgreSQL persistence |
 | **Working locally** | CRUD, input validation, bounded listing, health, readiness, request IDs, structured logs, and Prometheus metrics |
 | **Tests** | Handler tests and a PostgreSQL integration test using a dedicated `tasks_test` database; both passed locally |
-| **Cloud deployment** | Planned for AWS `us-east-1`; no Terraform or Kubernetes deployment is in this repository yet |
+| **Cloud deployment** | Planned for AWS `us-east-1`; ECR Terraform is prepared, but no AWS resources or Kubernetes workload have been deployed |
 | **Operational evidence** | CI runs, screenshots, SLO measurements, chaos results, and restore logs will be added when performed |
 
 ---
@@ -81,18 +84,19 @@ work; an unchecked item is a planned exercise, not a completed capability.
 | 1. Application | Go CRUD API, SQL migration, local PostgreSQL | ✅ CRUD, persistence, and database outage behaviour verified locally |
 | 2. Quality | Integration tests, formatting, linting, pre-commit | 🟡 CI workflow configured; first GitHub run and Codecov upload pending |
 | 3. Container | Multi-stage Dockerfile, non-root image, Trivy scan | 🟡 Both images pass local HIGH/CRITICAL Trivy gate; GitHub CI run pending |
-| 4. AWS foundation | IAM, VPC, EC2, S3, ECR, CloudWatch; Terraform and Ansible | 🟡 ECR publish workflow prepared but disabled; AWS setup pending |
+| 4. AWS foundation | IAM, VPC, EC2, S3, ECR, CloudWatch; Terraform and Ansible | 🟡 ECR Public and OIDC Terraform prepared but not applied; publishing disabled |
 | 5. Kubernetes | K3s first; Services, probes, Secrets, storage, RBAC | ⬜ Planned |
 | 6. Delivery | GitHub Actions, Helm, Argo CD and immutable image promotion | ⬜ Planned |
-| 7. Operations | Prometheus, Grafana, Alertmanager, SLI/SLO and PagerDuty | ⬜ Planned |
-| 8. Resilience | k6, smoke tests, chaos exercise, backup/restore and runbooks | ⬜ Planned |
-| 9. Extensions | SonarQube, Jenkins comparison, small Go operator, temporary EKS exercise | 🟡 SonarQube Cloud project imported; token and first CI analysis pending |
+| 7. Service discovery and secrets | Consul registration/discovery lab; Vault-backed database secret and rotation drill | ⬜ Planned; local exercises first, cluster integration later |
+| 8. Operations | Prometheus, Grafana, Alertmanager, SLI/SLO and PagerDuty | ⬜ Planned |
+| 9. Resilience | k6, smoke tests, chaos exercise, backup/restore and runbooks | ⬜ Planned |
+| 10. Extensions | SonarQube, Jenkins comparison, small Go operator, temporary EKS exercise | 🟡 First CI analysis imported Go coverage; new-code security gate needs a passing rerun |
 
 The older [project specification](01-project-specification.md) and
 [ten-day plan](02-ten-day-implementation-plan.md) were drafted for a VPS and
-GHCR. **Their hosting and registry assumptions are superseded here by AWS and
-ECR.** Use their acceptance criteria as ideas, not as a record of completed
-work.
+GHCR. **Their hosting, registry, and tool scope are superseded here by AWS,
+ECR, Consul, and Vault.** Use their acceptance criteria as ideas, not as a
+record of completed work.
 
 ---
 
@@ -200,6 +204,13 @@ flowchart LR
     Argo --> K3s
     ECR --> K3s
     K3s --> App["Go API + PostgreSQL"]
+    K3s -. "service catalog lab" .-> Consul["Consul<br/>registration and discovery"]
+    K3s -. "secrets lab" .-> Vault["Vault<br/>database credential source"]
+    Vault --> VSO["Vault Secrets Operator"]
+    VSO --> KSecret["Kubernetes Secret"]
+    KSecret --> App
+    KSecret --> Migration["Migration Job"]
+    Migration --> App
     K3s --> Obs["Prometheus · Grafana<br/>Alertmanager"]
     Obs --> PD["PagerDuty"]
     App --> Backup["S3 backup exercise"]
@@ -208,7 +219,10 @@ flowchart LR
 
 **Ownership rule:** Terraform provisions AWS resources; Ansible configures the
 Linux host; Helm packages Kubernetes workloads; Argo CD reconciles releases
-from Git. Each resource should have one owner.
+from Git; Vault owns the database credential in the secrets exercise. Consul
+is a service discovery lab, while Kubernetes DNS remains the API's normal
+discovery path. Each resource should have one owner. See the
+[Consul and Vault learning flow](docs/service-discovery-and-secrets.md).
 
 ### ☁️ Why these six AWS services?
 
@@ -233,6 +247,8 @@ is required for the core project.
 | CI quality gate | One failing check and a passing rerun |
 | Image promotion | Commit SHA, image digest, and deployed revision |
 | GitOps rollback | Bad release, diagnosis, Git revert, restored service |
+| Consul discovery | Registered service, health-aware lookup, failed health check, and cleanup |
+| Vault secret delivery | Least-privilege read, Kubernetes sync, credential change, restart, and revoked old credential |
 | Observability | Request rate, error ratio, p95/p99 latency, resource dashboard |
 | Alerting | Alert fires, reaches PagerDuty, resolves, and links to a runbook |
 | Chaos | Controlled pod or dependency failure with detection/recovery times |
@@ -255,10 +271,12 @@ run. No latency, availability, or recovery result is claimed yet.
 | 🧾 | [Backend local evidence](docs/evidence/backend-local.md) | Tests, persistence, outage and smoke-test results |
 | 🐳 | [Container walkthrough](docs/containers.md) | Dockerfile stages, Compose startup, smoke test and cleanup |
 | 🔐 | [Security and publishing](docs/security-and-publishing.md) | Trivy, SonarQube Cloud and ECR setup |
+| 🗝️ | [Consul and Vault learning flow](docs/service-discovery-and-secrets.md) | Local-first discovery and secrets exercises, verification and teardown |
 | 🧾 | [Image scan evidence](docs/evidence/container-security.md) | Initial pgx findings and clean rescans |
 | 🐳 | [Compose file](compose.yaml) | Local PostgreSQL, migration and API services |
 | ✅ | [CI workflow](.github/workflows/ci.yml) | Push checks, PostgreSQL tests, and Codecov upload |
-| 📦 | [ECR workflow](.github/workflows/publish-ecr.yml) | SHA-tagged image publishing after a passing CI run; disabled by default |
+| 📦 | [ECR workflow](.github/workflows/publish-ecr.yml) | ECR Public image publishing after a merged PR and passing CI; disabled by default |
+| ☁️ | [ECR Terraform](infra/ecr-public/main.tf) | Public repository and narrow GitHub OIDC publish role; not applied |
 | 🤝 | [Contributing](CONTRIBUTING.md) | Development and pull request workflow |
 | 🔐 | [Security policy](SECURITY.md) | Private vulnerability reporting |
 | 📜 | [Code of conduct](CODE_OF_CONDUCT.md) | Community expectations |
@@ -281,6 +299,7 @@ Dockerfile                       API and migration images
 compose.yaml                     Local PostgreSQL, migration and API
 docs/containers.md              Container walkthrough
 docs/security-and-publishing.md Trivy, SonarQube Cloud and ECR setup
+docs/service-discovery-and-secrets.md Planned Consul and Vault exercises
 sonar-project.properties        Go analysis and coverage configuration
 01-project-specification.md      Earlier project draft
 02-ten-day-implementation-plan.md Earlier implementation draft
@@ -292,7 +311,7 @@ SECURITY.md                      Vulnerability reporting
 LICENSE                          MIT license
 ```
 
-Future directories for Terraform, Ansible, Helm, GitOps, monitoring, and
+Future directories for Ansible, Helm, GitOps, Consul, Vault, monitoring, and
 recovery tests will be listed when their contents are committed.
 
 ---
@@ -342,6 +361,8 @@ deployment smoke-test evidence are still planned.
 | Image provenance | Deployment references a scanned immutable digest |
 | Reconciliation | A manual Kubernetes drift is corrected from Git |
 | Data recovery | Backup restores records into a fresh database |
+| Secret rotation | New database credential reaches the API and migration Job; old access is revoked |
+| Service discovery | Consul returns a registered healthy service and stops returning it after failure |
 | Cloud cost | Temporary AWS resources are inventoried and destroyed |
 
 ---
@@ -354,6 +375,7 @@ deployment smoke-test evidence are still planned.
 | No completed dashboard or alert rules | `/metrics` is available, but Prometheus/Grafana deployment is still planned |
 | Single local PostgreSQL instance | No high availability; the Docker volume is not an off-server backup |
 | AWS/Kubernetes configuration absent | The target architecture has not been deployed or validated |
+| Consul and Vault not installed | Their discovery and secret delivery flows are planned learning exercises |
 | Older planning documents describe a VPS and GHCR | Follow the AWS/ECR direction in this README for current project intent |
 
 ---
